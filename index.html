@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>ウイスキーおすすめ提示ツール</title>
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ウイスキーおすすめ">
+<meta name="theme-color" content="#5a3a1a">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<style>
+  :root {
+    --whisky: #7a4a1e;
+    --whisky-dark: #4d2f12;
+    --amber: #c98a2c;
+    --amber-soft: #f0dcb8;
+    --cream: #faf5ec;
+    --paper: #ffffff;
+    --ink: #2b2420;
+    --ink-soft: #766a60;
+    --border: #e9ddc9;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Hiragino Kaku Gothic ProN", sans-serif;
+    max-width: 900px; margin: 0 auto; padding: 14px 12px 32px;
+    background: var(--cream); color: var(--ink); line-height: 1.5;
+  }
+  h1, h2, h3 { font-family: "Hiragino Mincho ProN", Georgia, serif; font-weight: 600; letter-spacing: .02em; }
+  h1 { font-size: 21px; margin: 4px 0 14px; color: var(--whisky-dark); text-align: center; }
+  fieldset { margin-bottom: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--paper); }
+  legend { font-weight: 600; padding: 0 8px; color: var(--whisky); font-size: 14px; }
+  label { display: inline-block; margin: 6px 10px 6px 0; padding: 4px 2px; }
+  label input[type="checkbox"] { width: 18px; height: 18px; vertical-align: middle; margin-right: 4px; accent-color: var(--whisky); }
+  input[type="text"], input[type="password"] {
+    font-size: 16px; padding: 9px 10px; width: 100%; margin: 4px 0 8px;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--paper); color: var(--ink);
+  }
+  input:focus { outline: 2px solid var(--amber-soft); border-color: var(--amber); }
+  button { font-size: 16px; padding: 12px 20px; margin-top: 4px; border-radius: 10px; cursor: pointer; transition: transform .05s ease, opacity .15s ease; }
+  button:active { transform: scale(0.98); }
+  button.primary { width: 100%; background: var(--whisky); color: #fff; border: none; box-shadow: 0 2px 6px rgba(122,74,30,0.25); }
+  button.secondary { background: var(--paper); border: 1px solid var(--whisky); color: var(--whisky); }
+  .tabBar { display: flex; gap: 6px; margin-bottom: 14px; position: sticky; top: 0; background: var(--cream); padding: 10px 0 6px; z-index: 5; }
+  .tabBtn { flex: 1; padding: 10px 4px; font-size: 13px; border: 1px solid var(--border); background: var(--paper); color: var(--ink-soft); border-radius: 999px; font-weight: 600; transition: all .15s ease; }
+  .tabBtn.active { background: var(--whisky); color: #fff; border-color: var(--whisky); box-shadow: 0 2px 6px rgba(122,74,30,0.25); }
+  .tabPanel { display: none; }
+  .tabPanel.active { display: block; animation: fadeIn .2s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+  .card {
+    border: 1px solid var(--border); border-left: 4px solid var(--amber);
+    border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; background: var(--paper);
+    box-shadow: 0 1px 3px rgba(43,36,32,0.06), 0 1px 2px rgba(43,36,32,0.04);
+  }
+  .card h3 { margin: 0 0 6px 0; font-size: 16px; display: flex; align-items: center; gap: 6px; }
+  .score {
+    font-weight: 700; color: var(--whisky-dark); font-size: 12px; background: var(--amber-soft);
+    padding: 2px 9px; border-radius: 999px; white-space: nowrap; margin-left: auto;
+  }
+  .meta { color: var(--ink-soft); font-size: 13px; }
+  .tag {
+    display: inline-block; background: var(--cream); border: 1px solid var(--border); color: var(--ink);
+    border-radius: 999px; padding: 3px 10px; margin: 2px 4px 2px 0; font-size: 12px; cursor: pointer;
+  }
+  .tag.glossary { border-color: var(--amber); }
+  .highlight {
+    margin: 8px 0; font-size: 14px; color: var(--whisky-dark); background: var(--amber-soft);
+    padding: 8px 10px; border-radius: 8px; border-left: 3px solid var(--amber);
+  }
+  .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--ink-soft); letter-spacing: .02em; }
+  .caution { color: #8a3b1c; font-size: 12px; background: #fbeee5; padding: 6px 8px; border-radius: 6px; margin-top: 6px; }
+  .muted { color: var(--ink-soft); font-size: 13px; }
+  .syncBar { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--ink-soft); margin-bottom: 6px; }
+  #regionField { display: none; }
+  .overlay { position: fixed; inset: 0; background: rgba(43,36,32,0.45); display: flex; align-items: flex-end; z-index: 20; backdrop-filter: blur(1px); }
+  .hidden { display: none; }
+  .overlay.hidden { display: none; }
+  .sheet { background: var(--paper); width: 100%; max-height: 85vh; overflow-y: auto; border-radius: 16px 16px 0 0; padding: 18px; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); }
+  .sheet .closeBtn { width: 100%; margin-top: 12px; }
+  #adminGate { margin-bottom: 12px; }
+  #adminBody { display: none; }
+  .msg { padding: 9px 11px; border-radius: 8px; margin: 8px 0; font-size: 14px; }
+  .msg.ok { background: #e6f4ea; color: #1e4620; }
+  .msg.err { background: #fdecea; color: #611a15; }
+  #authGate { position: fixed; inset: 0; background: linear-gradient(180deg, var(--whisky-dark), var(--whisky)); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  #authGate.hidden { display: none; }
+  .authBox { max-width: 360px; width: 100%; background: var(--paper); border-radius: 16px; padding: 24px 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.25); }
+  .authBox h2 { font-size: 19px; margin: 0 0 4px; color: var(--whisky-dark); text-align: center; }
+  .authBox .muted { text-align: center; margin-bottom: 14px; }
+  .adminListRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .adminListRow:last-child { border-bottom: none; }
+  .adminListRow .name { font-size: 14px; }
+  .adminListRow button { margin-top: 0; padding: 6px 12px; font-size: 13px; width: auto; }
+
+  @media (max-width: 480px) {
+    body { padding: 10px 8px 28px; font-size: 15px; }
+    label { display: block; }
+  }
+</style>
+</head>
+<body>
+
+<div id="authGate">
+  <div class="authBox">
+    <h2>スタッフパスコード</h2>
+    <p class="muted">この先は店舗スタッフ専用です。パスコードを入力してください。</p>
+    <input type="password" id="authPasscode" placeholder="パスコード">
+    <button type="button" id="authButton" class="primary">開く</button>
+    <div id="authMsg"></div>
+  </div>
+</div>
+
+<div id="appRoot" style="display:none;">
+
+<h1>ウイスキーおすすめ提示ツール</h1>
+<div class="syncBar">
+  <span id="syncStatus">同期状況を確認中...</span>
+  <button type="button" id="syncButton" class="secondary" style="padding:4px 10px;font-size:12px;">今すぐ同期</button>
+</div>
+
+<div class="tabBar">
+  <button type="button" class="tabBtn active" data-tab="recommend">レコメンド</button>
+  <button type="button" class="tabBtn" data-tab="list">一覧</button>
+  <button type="button" class="tabBtn" data-tab="admin">管理</button>
+</div>
+
+<section id="tab-recommend" class="tabPanel active">
+  <form id="criteriaForm">
+    <fieldset>
+      <legend>フリーワード検索（任意）</legend>
+      <input type="text" id="recommendFreeText" placeholder="商品名・国・地方で検索">
+    </fieldset>
+
+    <fieldset>
+      <legend>価格帯</legend>
+      <div id="priceFields"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>国・地方</legend>
+      <div><b>国</b><div id="countryFields"></div></div>
+      <div id="regionField"><b>地方（スコッチ）</b><div id="regionFields"></div></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>味わい <span class="muted">（タグをタップすると説明が見られます）</span></legend>
+      <div id="flavorFields"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>飲み方</legend>
+      <div id="servingStyleFields"></div>
+    </fieldset>
+
+    <button type="button" id="searchButton" class="primary">この条件で探す</button>
+    <button type="button" id="clearCriteriaButton" class="secondary" style="width:100%;margin-top:8px;">条件をクリア</button>
+  </form>
+
+  <div id="results"></div>
+</section>
+
+<section id="tab-list" class="tabPanel">
+  <input type="text" id="listSearch" placeholder="商品名・国・地方で検索">
+  <div id="listResults"></div>
+</section>
+
+<section id="tab-admin" class="tabPanel">
+  <div id="adminGate">
+    <p class="muted">取り扱い終了・再開の操作には、閲覧用とは別の管理パスコードが必要です。</p>
+    <input type="password" id="adminPasscode" placeholder="管理パスコード">
+    <button type="button" id="adminUnlockButton" class="secondary">管理画面を開く</button>
+  </div>
+
+  <div id="adminBody">
+    <div id="adminMsg"></div>
+
+    <fieldset>
+      <legend>取り扱い終了にする</legend>
+      <div id="admActiveList"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>取り扱いを再開する</legend>
+      <div id="admDiscontinuedList"></div>
+    </fieldset>
+  </div>
+</section>
+
+<div id="detailOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div id="detailContent"></div>
+    <button type="button" id="detailCloseButton" class="secondary closeBtn">閉じる</button>
+  </div>
+</div>
+
+<div id="glossaryOverlay" class="overlay hidden">
+  <div class="sheet">
+    <div id="glossaryContent"></div>
+    <button type="button" id="glossaryCloseButton" class="secondary closeBtn">閉じる</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+// 酒部門/ウイスキーおすすめツール/scoring.js
+// 選択肢の定義とマッチングロジック（純粋関数）。
+// build.js でこのファイルの中身がそのまま index.html に埋め込まれるため、
+// ブラウザ・Node.js のどちらでも動く形（ファイル末尾のエクスポート文のみ Node 依存）にしてある。
+
+const PRICE_BANDS = [
+  { id: 'under2000', label: '〜2,000円', min: 0, max: 2000 },
+  { id: '2000to5000', label: '2,000〜5,000円', min: 2000, max: 5000 },
+  { id: '5000to10000', label: '5,000〜10,000円', min: 5000, max: 10000 },
+  { id: 'over10000', label: '10,000円〜', min: 10000, max: Infinity },
+];
+
+const COUNTRIES = ['スコットランド', 'アイルランド', 'アメリカ', '日本', 'カナダ', 'その他'];
+
+// 国 → 地方（スコットランド選択時のみ地方欄を表示する）
+const REGIONS_BY_COUNTRY = {
+  スコットランド: ['スペイサイド', 'ハイランド', 'ローランド', 'アイラ', 'アイランズ', 'キャンベルタウン'],
+};
+
+const FLAVOR_TAGS = ['スモーキー・ピーティー', 'フルーティー', '甘口・バニラ系', 'スパイシー', 'まろやか', '力強い・重厚'];
+
+const SERVING_STYLE_TAGS = ['ストレート', 'ロック', 'ハイボール', '水割り', 'カクテル向き'];
+
+function priceBandsForProduct(price) {
+  if (price === null || price === undefined) return [];
+  return PRICE_BANDS.filter((b) => price >= b.min && price < b.max).map((b) => b.id);
+}
+
+function scoreProduct(product, criteria) {
+  let totalCriteria = 0;
+  let matchedCount = 0;
+  const breakdown = {};
+
+  if (criteria.priceBandIds && criteria.priceBandIds.length > 0) {
+    if (product.price !== null && product.price !== undefined) {
+      totalCriteria++;
+      const bandIds = priceBandsForProduct(product.price);
+      const matched = bandIds.some((id) => criteria.priceBandIds.includes(id));
+      if (matched) matchedCount++;
+      breakdown.price = matched;
+    } else {
+      breakdown.price = null;
+    }
+  }
+
+  if (criteria.countries && criteria.countries.length > 0) {
+    totalCriteria++;
+    const matched = product.country != null && criteria.countries.includes(product.country);
+    if (matched) matchedCount++;
+    breakdown.country = matched;
+  }
+
+  if (criteria.regions && criteria.regions.length > 0) {
+    totalCriteria++;
+    const matched = product.region != null
+      && (Array.isArray(product.region) ? product.region : [product.region]).some((r) => criteria.regions.includes(r));
+    if (matched) matchedCount++;
+    breakdown.region = matched;
+  }
+
+  if (criteria.flavors && criteria.flavors.length > 0) {
+    totalCriteria++;
+    const matched = (product.flavors || []).some((f) => criteria.flavors.includes(f));
+    if (matched) matchedCount++;
+    breakdown.flavors = matched;
+  }
+
+  if (criteria.servingStyles && criteria.servingStyles.length > 0) {
+    totalCriteria++;
+    const matched = (product.servingStyles || []).some((s) => criteria.servingStyles.includes(s));
+    if (matched) matchedCount++;
+    breakdown.servingStyles = matched;
+  }
+
+  const score = totalCriteria === 0 ? 0 : matchedCount / totalCriteria;
+  return { score, matchedCount, totalCriteria, breakdown };
+}
+
+// 商品名・国・地方を対象にした部分一致検索（一覧タブ・レコメンドタブ共通）
+function matchesFreeText(product, text) {
+  if (!text) return true;
+  const regionValues = Array.isArray(product.region) ? product.region : [product.region];
+  return [product.name, product.country, ...regionValues].filter(Boolean).some((v) => v.includes(text));
+}
+
+function rankProducts(products, criteria, topN) {
+  const active = products.filter((p) => p.status !== 'discontinued' && matchesFreeText(p, criteria.freeText));
+  const scored = active.map((p) => ({ product: p, ...scoreProduct(p, criteria) }));
+  scored.sort((a, b) => b.score - a.score || b.matchedCount - a.matchedCount);
+  return scored.slice(0, topN);
+}
+
+
+</script>
+<script>
+const SEED_PRODUCTS = [
+  {
+    "code": "SAMPLE-001",
+    "name": "（サンプル）スペイサイド12年",
+    "spec": "700ml",
+    "price": 4500,
+    "country": "スコットランド",
+    "region": "スペイサイド",
+    "flavors": ["フルーティー", "甘口・バニラ系"],
+    "servingStyles": ["ストレート", "ロック"],
+    "highlight": "りんごや洋梨のフルーティーな香りとはちみつのような甘さが調和した、スペイサイドらしいバランスの良い12年熟成です。",
+    "highlightConfidence": "high",
+    "highlightSource": null,
+    "attributeConfidence": "high",
+    "attributeSource": null,
+    "status": "active"
+  },
+  {
+    "code": "SAMPLE-002",
+    "name": "（サンプル）アイラ ピーテッドモルト",
+    "spec": "700ml",
+    "price": 6800,
+    "country": "スコットランド",
+    "region": "アイラ",
+    "flavors": ["スモーキー・ピーティー", "力強い・重厚"],
+    "servingStyles": ["ストレート", "ロック"],
+    "highlight": "ピート由来のスモーキーな香りと潮風を思わせる塩気が特徴的な、アイラらしい力強い一本です。",
+    "highlightConfidence": "high",
+    "highlightSource": null,
+    "attributeConfidence": "high",
+    "attributeSource": null,
+    "status": "active"
+  },
+  {
+    "code": "SAMPLE-003",
+    "name": "（サンプル）ジャパニーズブレンデッド",
+    "spec": "700ml",
+    "price": 3200,
+    "country": "日本",
+    "region": null,
+    "flavors": ["まろやか", "甘口・バニラ系"],
+    "servingStyles": ["ハイボール", "水割り"],
+    "highlight": "クセが少なくまろやかな口当たりで、ハイボールにすると食事にもよく合う定番ブレンデッドです。",
+    "highlightConfidence": "medium",
+    "highlightSource": null,
+    "attributeConfidence": "medium",
+    "attributeSource": null,
+    "status": "active"
+  },
+  {
+    "code": "SAMPLE-004",
+    "name": "（サンプル）バーボンスタンダード",
+    "spec": "750ml",
+    "price": 2400,
+    "country": "アメリカ",
+    "region": null,
+    "flavors": ["甘口・バニラ系", "スパイシー"],
+    "servingStyles": ["ロック", "ハイボール", "カクテル向き"],
+    "highlight": "トウモロコシ由来の甘さとオーク樽のスパイシーさが楽しめる、コスパの良い定番バーボンです。",
+    "highlightConfidence": "high",
+    "highlightSource": null,
+    "attributeConfidence": "high",
+    "attributeSource": null,
+    "status": "active"
+  },
+  {
+    "code": "SAMPLE-005",
+    "name": "（サンプル）カナディアンライト",
+    "spec": "700ml",
+    "price": 2000,
+    "country": "カナダ",
+    "region": null,
+    "flavors": ["まろやか"],
+    "servingStyles": ["ハイボール", "水割り"],
+    "highlight": "軽やかでクセのない味わいで、ウイスキーが初めての方にも試しやすい一本です。",
+    "highlightConfidence": "medium",
+    "highlightSource": null,
+    "attributeConfidence": "medium",
+    "attributeSource": null,
+    "status": "active"
+  },
+  {
+    "code": "SAMPLE-006",
+    "name": "（サンプル）アイリッシュシングルポットスチル",
+    "spec": "700ml",
+    "price": 5200,
+    "country": "アイルランド",
+    "region": null,
+    "flavors": ["フルーティー", "スパイシー"],
+    "servingStyles": ["ストレート", "ロック"],
+    "highlight": "モルトとグレーンの両方の個性を持つシングルポットスチル製法ならではの、クリーミーでスパイシーな味わいです。",
+    "highlightConfidence": "high",
+    "highlightSource": null,
+    "attributeConfidence": "high",
+    "attributeSource": null,
+    "status": "active"
+  },
+  {
+    "code": "SAMPLE-007",
+    "name": "（サンプル）ハイランド18年",
+    "spec": "700ml",
+    "price": 12800,
+    "country": "スコットランド",
+    "region": "ハイランド",
+    "flavors": ["力強い・重厚", "甘口・バニラ系"],
+    "servingStyles": ["ストレート"],
+    "highlight": "18年の長期熟成による厚みのある甘さと、ハイランドらしい骨太な味わいが楽しめる贈答にも向く一本です。",
+    "highlightConfidence": "high",
+    "highlightSource": null,
+    "attributeConfidence": "high",
+    "attributeSource": null,
+    "status": "active"
+  },
+  {
+    "code": "SAMPLE-008",
+    "name": "（サンプル）取扱終了デモ用ウイスキー",
+    "spec": "700ml",
+    "price": 3000,
+    "country": "その他",
+    "region": null,
+    "flavors": [],
+    "servingStyles": [],
+    "highlight": "管理タブでの「取扱終了」表示・一覧からの除外を確認するためのサンプルです。",
+    "highlightConfidence": "high",
+    "highlightSource": null,
+    "attributeConfidence": "high",
+    "attributeSource": null,
+    "status": "discontinued"
+  }
+]
+;
+
+// ここにGoogle Apps ScriptのWebアプリURLを設定すると、スタッフパスコードでの同期・
+// 管理タブでの取り扱い終了/再開が有効になる。
+// 未設定の間は開発確認用として、パスコード入力後にSEED_PRODUCTS（非機密のプレースホルダー）
+// を表示する（実データではないので公開ホスティングしても問題ない）。
+// 設定後は build.js を再実行して index.html を作り直すこと。
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxlsNvBD-V_v4XSuUHUsDHogf-8HKX0_MJSk2-5ylpoDfSWGpbzHmy7sdhxcAyCJv6n/exec';
+
+const STORAGE_KEY = 'whiskyToolCache_v1';
+const STAFF_PASSCODE_KEY = 'whiskyToolStaffPasscode_v1';
+
+// タグ用語集（1タグにつき1つの固定定義。愛好家が読んでも納得できる説明を優先している）
+const FLAVOR_GLOSSARY = {
+  'スモーキー・ピーティー': '麦芽をピート（泥炭）で燻して乾燥させる工程に由来する、煙・ヨードのような燻香や薬品香（正露丸に例えられることも）。アイラ島の銘柄に顕著です。',
+  'フルーティー': '発酵・蒸留由来のエステル香による、りんご・洋梨・柑橘系の果実香。バーボン樽熟成では黄色系果実、シェリー樽ではドライフルーツ寄りの甘い果実香になりやすいです。',
+  '甘口・バニラ系': 'バーボン樽（アメリカンオーク）由来のバニラ・ココナッツ・カラメルのような甘い香り。樽材のラクトン化合物による典型的な香りです。',
+  'スパイシー': 'オーク由来のクローブ・シナモン・黒こしょうを思わせるスパイス香。ライ麦を使った原酒や、熟成年数が長いものに出やすいです。',
+  'まろやか': 'エタノールの刺激が穏やかで口当たりがなめらかなこと。長期熟成や複数原酒のブレンドによって角が取れたものに多いです。',
+  '力強い・重厚': 'アルコール度数の高さや原酒の骨太さからくる、飲みごたえのある濃厚な味わい。シェリー樽熟成やカスクストレングス（樽出し度数）のものに多いです。',
+};
+
+const REGION_GLOSSARY = {
+  'スペイサイド': 'スコットランドで最も蒸留所が密集するエリア。りんごや洋梨のフルーティーさと、はちみつ・バニラの甘さを持つ、エレガントでバランスの良い味わいが主流です（グレンリベット、マッカラン等）。',
+  'ハイランド': 'スコットランド北部の広大なエリアで、蒸留所ごとの個性差が大きいのが特徴。全体としては蜂蜜や麦芽の甘みとほのかな潮っぽさを持つものが多いです。',
+  'ローランド': 'スコットランド南部。ピートを使わない軽やかでライトな味わいが主流で、草花のような香りやシトラス感が特徴です。',
+  'アイラ': 'スコットランド西方の島。ピート由来のスモーキー・ヨード香が強い個性の強い銘柄が多いです（ラフロイグ、アードベッグ等）。海藻や潮のニュアンスも特徴です。',
+  'アイランズ': 'アイラ以外の島嶼部（スカイ島、アラン島等）の総称。潮風や塩気を感じるものが多く、ピートの強さは蒸留所によって差が大きいです。',
+  'キャンベルタウン': 'かつて蒸留所が集中していた港町。塩気とオイリーな質感、わずかな煙香を併せ持つ独特のスタイルです（スプリングバンク等）。',
+};
+
+let PRODUCTS = [];
+
+function loadCache() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed.products || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveCache(products) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ products, syncedAt: Date.now() }));
+  } catch (e) {
+    // 保存できなくても動作は継続する
+  }
+}
+
+function getLastSyncedAt() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw).syncedAt || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function formatSyncedAt(ts) {
+  if (!ts) return '未同期';
+  const d = new Date(ts);
+  return '最終同期: ' + d.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function updateSyncStatus() {
+  document.getElementById('syncStatus').textContent = formatSyncedAt(getLastSyncedAt());
+}
+
+// スタッフパスコードを添えてApps Scriptから最新データを取得する。
+// 戻り値: { ok, reason } reasonは 'network'（通信不可）/ 'invalid'（パスコード誤り）/ 'not_configured'
+async function syncFromServer(passcode, silent) {
+  if (!APPS_SCRIPT_URL) {
+    return { ok: false, reason: 'not_configured' };
+  }
+  try {
+    const url = APPS_SCRIPT_URL + '?passcode=' + encodeURIComponent(passcode);
+    const res = await fetch(url, { method: 'GET' });
+    const data = await res.json();
+    if (data.error === 'passcode_invalid') {
+      return { ok: false, reason: 'invalid' };
+    }
+    if (!data.products) throw new Error('invalid_response');
+    PRODUCTS = data.products;
+    saveCache(PRODUCTS);
+    updateSyncStatus();
+    renderListResults();
+    populateAdminLists();
+    return { ok: true };
+  } catch (e) {
+    if (!silent) alert('同期に失敗しました。通信環境をご確認ください。');
+    return { ok: false, reason: 'network' };
+  }
+}
+
+document.getElementById('syncButton').addEventListener('click', async () => {
+  const passcode = localStorage.getItem(STAFF_PASSCODE_KEY) || '';
+  await syncFromServer(passcode, false);
+});
+
+// ---------- 起動時認証ゲート ----------
+
+function showAuthError(text) {
+  document.getElementById('authMsg').innerHTML = `<div class="msg err">${text}</div>`;
+}
+
+function enterApp() {
+  document.getElementById('authGate').classList.add('hidden');
+  document.getElementById('appRoot').style.display = 'block';
+  startApp();
+}
+
+async function tryStaffLogin(passcode, silent) {
+  if (!APPS_SCRIPT_URL) {
+    // Apps Script未設定時の開発確認用フォールバック（非機密のプレースホルダーデータのみ使用）
+    PRODUCTS = loadCache() || SEED_PRODUCTS;
+    localStorage.setItem(STAFF_PASSCODE_KEY, passcode);
+    return true;
+  }
+  const result = await syncFromServer(passcode, true);
+  if (result.ok) {
+    localStorage.setItem(STAFF_PASSCODE_KEY, passcode);
+    return true;
+  }
+  if (result.reason === 'network') {
+    // オフライン時は、直近まで認証済みだった端末ならキャッシュで継続動作させる
+    const cached = loadCache();
+    if (cached && localStorage.getItem(STAFF_PASSCODE_KEY)) {
+      PRODUCTS = cached;
+      return true;
+    }
+    if (!silent) showAuthError('通信環境をご確認ください（初回はオンラインでの認証が必要です）。');
+    return false;
+  }
+  if (!silent) showAuthError('パスコードが正しくありません。');
+  localStorage.removeItem(STAFF_PASSCODE_KEY);
+  return false;
+}
+
+document.getElementById('authButton').addEventListener('click', async () => {
+  const passcode = document.getElementById('authPasscode').value;
+  if (!passcode) { showAuthError('パスコードを入力してください'); return; }
+  const ok = await tryStaffLogin(passcode, false);
+  if (ok) enterApp();
+});
+
+async function initAuth() {
+  const storedPasscode = localStorage.getItem(STAFF_PASSCODE_KEY);
+  if (storedPasscode) {
+    const ok = await tryStaffLogin(storedPasscode, true);
+    if (ok) { enterApp(); return; }
+  }
+  // ゲート画面のまま入力待ち
+}
+
+// ---------- 用語集ポップアップ ----------
+
+function openGlossary(term) {
+  const def = FLAVOR_GLOSSARY[term] || REGION_GLOSSARY[term];
+  if (!def) return;
+  document.getElementById('glossaryContent').innerHTML = `<h2>${term}</h2><p>${def}</p>`;
+  document.getElementById('glossaryOverlay').classList.remove('hidden');
+}
+
+document.getElementById('glossaryCloseButton').addEventListener('click', () => {
+  document.getElementById('glossaryOverlay').classList.add('hidden');
+});
+
+function glossaryTagHtml(term, extraClass) {
+  const hasGlossary = FLAVOR_GLOSSARY[term] || REGION_GLOSSARY[term];
+  const cls = 'tag' + (hasGlossary ? ' glossary' : '') + (extraClass ? ' ' + extraClass : '');
+  return `<span class="${cls}" data-term="${term}">${term}${hasGlossary ? ' ⓘ' : ''}</span>`;
+}
+
+// タグクリックで用語集を開く（イベント委譲。結果カード・フォーム双方に対応）
+document.body.addEventListener('click', (e) => {
+  const tagEl = e.target.closest('.tag.glossary');
+  if (tagEl) {
+    openGlossary(tagEl.getAttribute('data-term'));
+  }
+});
+
+// ---------- レコメンドタブ ----------
+
+function renderCheckboxGroup(containerId, name, values, withGlossary) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = values.map((v) => {
+    const info = withGlossary && (FLAVOR_GLOSSARY[v] || REGION_GLOSSARY[v])
+      ? ` <span class="tag glossary" data-term="${v}" style="padding:1px 6px;">ⓘ</span>` : '';
+    return `<label><input type="checkbox" name="${name}" value="${v}">${v}${info}</label>`;
+  }).join('');
+}
+
+function initForm() {
+  renderCheckboxGroup('priceFields', 'price', PRICE_BANDS.map((b) => b.label));
+  renderCheckboxGroup('countryFields', 'country', COUNTRIES);
+  renderCheckboxGroup('flavorFields', 'flavor', FLAVOR_TAGS, true);
+  renderCheckboxGroup('servingStyleFields', 'servingStyle', SERVING_STYLE_TAGS);
+
+  document.getElementById('countryFields').addEventListener('change', updateRegionField);
+}
+
+function updateRegionField() {
+  const checkedCountries = getCheckedValues('country');
+  const applicableRegions = Array.from(new Set(
+    checkedCountries.flatMap((c) => REGIONS_BY_COUNTRY[c] || [])
+  ));
+  const regionField = document.getElementById('regionField');
+  if (applicableRegions.length === 0) {
+    regionField.style.display = 'none';
+    renderCheckboxGroup('regionFields', 'region', []);
+    return;
+  }
+  regionField.style.display = 'block';
+  renderCheckboxGroup('regionFields', 'region', applicableRegions, true);
+}
+
+function getCheckedValues(name) {
+  return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map((el) => el.value);
+}
+
+function priceLabelsToBandIds(labels) {
+  return PRICE_BANDS.filter((b) => labels.includes(b.label)).map((b) => b.id);
+}
+
+function regionText(p) {
+  if (!p.region) return '';
+  return Array.isArray(p.region) ? p.region.join('・') : p.region;
+}
+
+function confidenceCaution(p) {
+  const lowConfidence = p.attributeConfidence === 'medium' || p.attributeConfidence === 'low' || p.attributeConfidence === 'not_found'
+    || p.highlightConfidence === 'medium' || p.highlightConfidence === 'low' || p.highlightConfidence === 'not_found';
+  return lowConfidence
+    ? `<div class="caution">⚠ 情報の確証度が低めです。商品コード <span class="code">${p.code}</span> で現物のラベルをご確認ください</div>`
+    : '';
+}
+
+function renderResultCard(entry) {
+  const p = entry.product;
+  const percent = Math.round(entry.score * 100);
+  const highlight = p.highlight ? `<div class="highlight">${p.highlight}</div>` : '';
+  return `
+    <div class="card">
+      <h3>${p.name}<span class="score">一致度 ${percent}%</span></h3>
+      <div class="meta">${p.price === null || p.price === undefined ? '価格不明' : p.price.toLocaleString() + '円'}${p.spec ? '（' + p.spec + '）' : ''} ／ ${p.country || '産地不明'}${regionText(p) ? '（' + regionText(p) + '）' : ''}</div>
+      <div>${(p.flavors || []).map((f) => glossaryTagHtml(f)).join('')}</div>
+      <div>${(p.servingStyles || []).map((s) => glossaryTagHtml(s)).join('')}</div>
+      ${highlight}
+      ${confidenceCaution(p)}
+      <div class="code" style="margin-top:6px;">コード: ${p.code}</div>
+    </div>
+  `;
+}
+
+document.getElementById('searchButton').addEventListener('click', () => {
+  const criteria = {
+    freeText: document.getElementById('recommendFreeText').value.trim(),
+    priceBandIds: priceLabelsToBandIds(getCheckedValues('price')),
+    countries: getCheckedValues('country'),
+    regions: getCheckedValues('region'),
+    flavors: getCheckedValues('flavor'),
+    servingStyles: getCheckedValues('servingStyle'),
+  };
+  const ranked = rankProducts(PRODUCTS, criteria, 20);
+  document.getElementById('results').innerHTML = ranked.length > 0
+    ? ranked.map(renderResultCard).join('')
+    : '<p class="muted">条件に合う商品が見つかりませんでした。条件を減らしてお試しください。</p>';
+});
+
+document.getElementById('clearCriteriaButton').addEventListener('click', () => {
+  document.getElementById('criteriaForm').querySelectorAll('input[type="checkbox"]').forEach((el) => { el.checked = false; });
+  document.getElementById('recommendFreeText').value = '';
+  updateRegionField();
+  document.getElementById('results').innerHTML = '';
+});
+
+// ---------- 一覧タブ ----------
+
+function renderListCard(p) {
+  return `
+    <div class="card" data-code="${p.code}">
+      <h3>${p.name}</h3>
+      <div class="meta">${p.price === null || p.price === undefined ? '価格不明' : p.price.toLocaleString() + '円'}${p.spec ? '（' + p.spec + '）' : ''} ／ ${p.country || '産地不明'}${regionText(p) ? '（' + regionText(p) + '）' : ''}</div>
+      <div>${(p.flavors || []).map((f) => `<span class="tag">${f}</span>`).join('')}</div>
+      <div class="code" style="margin-top:6px;">コード: ${p.code}</div>
+    </div>
+  `;
+}
+
+function renderListResults() {
+  const q = (document.getElementById('listSearch').value || '').trim();
+  const active = PRODUCTS.filter((p) => p.status !== 'discontinued');
+  const filtered = active.filter((p) => matchesFreeText(p, q));
+  const container = document.getElementById('listResults');
+  container.innerHTML = filtered.map(renderListCard).join('');
+  container.querySelectorAll('.card').forEach((card) => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.tag')) return; // タグクリックは用語集を優先
+      openDetail(card.getAttribute('data-code'));
+    });
+  });
+}
+
+document.getElementById('listSearch').addEventListener('input', renderListResults);
+
+// ---------- 詳細オーバーレイ ----------
+
+function openDetail(code) {
+  const p = PRODUCTS.find((x) => x.code === code);
+  if (!p) return;
+  document.getElementById('detailContent').innerHTML = `
+    <h2>${p.name}</h2>
+    <div class="meta">${p.price === null || p.price === undefined ? '価格不明' : p.price.toLocaleString() + '円'}${p.spec ? '（' + p.spec + '）' : ''} ／ ${p.country || '産地不明'}${regionText(p) ? '（' + regionText(p) + '）' : ''}</div>
+    <div>${(p.flavors || []).map((f) => glossaryTagHtml(f)).join('')}</div>
+    <div>${(p.servingStyles || []).map((s) => glossaryTagHtml(s)).join('')}</div>
+    ${p.highlight ? `<div class="highlight">${p.highlight}</div>` : ''}
+    ${p.status === 'discontinued' ? '<div class="caution">現在は取扱終了商品です</div>' : ''}
+    ${confidenceCaution(p)}
+    <div class="code" style="margin-top:8px;">商品コード: ${p.code}</div>
+  `;
+  document.getElementById('detailOverlay').classList.remove('hidden');
+}
+
+document.getElementById('detailCloseButton').addEventListener('click', () => {
+  document.getElementById('detailOverlay').classList.add('hidden');
+});
+
+// ---------- 管理タブ（取り扱い終了・再開のみ） ----------
+
+let adminPasscodeValue = '';
+
+document.getElementById('adminUnlockButton').addEventListener('click', () => {
+  const value = document.getElementById('adminPasscode').value;
+  if (!value) {
+    alert('パスコードを入力してください');
+    return;
+  }
+  adminPasscodeValue = value;
+  document.getElementById('adminBody').style.display = 'block';
+  populateAdminLists();
+});
+
+function populateAdminLists() {
+  const active = PRODUCTS.filter((p) => p.status !== 'discontinued');
+  const discontinued = PRODUCTS.filter((p) => p.status === 'discontinued');
+
+  document.getElementById('admActiveList').innerHTML = active.map((p) => `
+    <div class="adminListRow">
+      <span class="name">${p.name}</span>
+      <button type="button" class="secondary admDiscontinueBtn" data-code="${p.code}">取り扱い終了</button>
+    </div>
+  `).join('') || '<p class="muted">対象商品がありません</p>';
+
+  document.getElementById('admDiscontinuedList').innerHTML = discontinued.map((p) => `
+    <div class="adminListRow">
+      <span class="name">${p.name}</span>
+      <button type="button" class="secondary admReactivateBtn" data-code="${p.code}">再開する</button>
+    </div>
+  `).join('') || '<p class="muted">取り扱い終了中の商品はありません</p>';
+
+  document.querySelectorAll('.admDiscontinueBtn').forEach((btn) => {
+    btn.addEventListener('click', () => setStatus(btn.getAttribute('data-code'), 'discontinued'));
+  });
+  document.querySelectorAll('.admReactivateBtn').forEach((btn) => {
+    btn.addEventListener('click', () => setStatus(btn.getAttribute('data-code'), 'active'));
+  });
+}
+
+function showAdminMsg(text, ok) {
+  const el = document.getElementById('adminMsg');
+  el.innerHTML = `<div class="msg ${ok ? 'ok' : 'err'}">${text}</div>`;
+}
+
+async function callAppsScript(payload) {
+  if (!APPS_SCRIPT_URL) {
+    showAdminMsg('Apps ScriptのURLが未設定です。READMEを参照して設定してください。', false);
+    return false;
+  }
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ ...payload, passcode: adminPasscodeValue }),
+    });
+    const data = await res.json();
+    if (data.error === 'passcode_invalid') {
+      showAdminMsg('パスコードが正しくありません。', false);
+      return false;
+    }
+    if (data.error) {
+      showAdminMsg('エラーが発生しました: ' + data.error, false);
+      return false;
+    }
+    const staffPasscode = localStorage.getItem(STAFF_PASSCODE_KEY) || '';
+    await syncFromServer(staffPasscode, true);
+    return true;
+  } catch (e) {
+    showAdminMsg('通信エラーが発生しました。通信環境をご確認ください。', false);
+    return false;
+  }
+}
+
+async function setStatus(code, status) {
+  const success = await callAppsScript({ action: 'setStatus', code, status });
+  if (success) showAdminMsg(status === 'discontinued' ? '取り扱い終了にしました' : '取り扱いを再開しました', true);
+}
+
+// ---------- タブ切り替え ----------
+
+document.querySelectorAll('.tabBtn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tabBtn').forEach((b) => b.classList.remove('active'));
+    document.querySelectorAll('.tabPanel').forEach((p) => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.getAttribute('data-tab')).classList.add('active');
+  });
+});
+
+// ---------- アプリ本体の初期化（認証成功後に実行） ----------
+
+function startApp() {
+  initForm();
+  updateRegionField();
+  renderListResults();
+  updateSyncStatus();
+  populateAdminLists();
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
+initAuth();
+</script>
+</body>
+</html>
