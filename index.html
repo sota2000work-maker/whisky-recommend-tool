@@ -664,9 +664,15 @@ function regionText(p) {
   return Array.isArray(p.region) ? p.region.join('・') : p.region;
 }
 
+function metaLineHtml(p) {
+  const price = p.price === null || p.price === undefined ? '価格不明' : p.price.toLocaleString() + '円';
+  const region = regionText(p) ? '（' + regionText(p) + '）' : '';
+  return `<div class="meta">${price}${p.spec ? '（' + p.spec + '）' : ''} ／ ${p.country || '産地不明'}${region}</div>`;
+}
+
+// 確証度が high 以外（未設定含む）なら警告する
 function confidenceCaution(p) {
-  const lowConfidence = p.attributeConfidence === 'medium' || p.attributeConfidence === 'low' || p.attributeConfidence === 'not_found'
-    || p.highlightConfidence === 'medium' || p.highlightConfidence === 'low' || p.highlightConfidence === 'not_found';
+  const lowConfidence = p.attributeConfidence !== 'high' || p.highlightConfidence !== 'high';
   return lowConfidence
     ? `<div class="caution">⚠ 情報の確証度が低めです。商品コード <span class="code">${p.code}</span> で現物のラベルをご確認ください</div>`
     : '';
@@ -679,7 +685,7 @@ function renderResultCard(entry) {
   return `
     <div class="card">
       <h3>${p.name}<span class="score">一致度 ${percent}%</span></h3>
-      <div class="meta">${p.price === null || p.price === undefined ? '価格不明' : p.price.toLocaleString() + '円'}${p.spec ? '（' + p.spec + '）' : ''} ／ ${p.country || '産地不明'}${regionText(p) ? '（' + regionText(p) + '）' : ''}</div>
+      ${metaLineHtml(p)}
       <div>${(p.flavors || []).map((f) => glossaryTagHtml(f)).join('')}</div>
       <div>${(p.servingStyles || []).map((s) => glossaryTagHtml(s)).join('')}</div>
       ${highlight}
@@ -698,6 +704,12 @@ document.getElementById('searchButton').addEventListener('click', () => {
     flavors: getCheckedValues('flavor'),
     servingStyles: getCheckedValues('servingStyle'),
   };
+  const hasCriteria = criteria.freeText || criteria.priceBandIds.length || criteria.countries.length
+    || criteria.regions.length || criteria.flavors.length || criteria.servingStyles.length;
+  if (!hasCriteria) {
+    document.getElementById('results').innerHTML = '<p class="muted">絞り込み条件を1つ以上選んでください。</p>';
+    return;
+  }
   const ranked = rankProducts(PRODUCTS, criteria, 20);
   document.getElementById('results').innerHTML = ranked.length > 0
     ? ranked.map(renderResultCard).join('')
@@ -717,7 +729,7 @@ function renderListCard(p) {
   return `
     <div class="card" data-code="${p.code}">
       <h3>${p.name}</h3>
-      <div class="meta">${p.price === null || p.price === undefined ? '価格不明' : p.price.toLocaleString() + '円'}${p.spec ? '（' + p.spec + '）' : ''} ／ ${p.country || '産地不明'}${regionText(p) ? '（' + regionText(p) + '）' : ''}</div>
+      ${metaLineHtml(p)}
       <div>${(p.flavors || []).map((f) => `<span class="tag">${f}</span>`).join('')}</div>
       <div class="code" style="margin-top:6px;">コード: ${p.code}</div>
     </div>
@@ -747,7 +759,7 @@ function openDetail(code) {
   if (!p) return;
   document.getElementById('detailContent').innerHTML = `
     <h2>${p.name}</h2>
-    <div class="meta">${p.price === null || p.price === undefined ? '価格不明' : p.price.toLocaleString() + '円'}${p.spec ? '（' + p.spec + '）' : ''} ／ ${p.country || '産地不明'}${regionText(p) ? '（' + regionText(p) + '）' : ''}</div>
+    ${metaLineHtml(p)}
     <div>${(p.flavors || []).map((f) => glossaryTagHtml(f)).join('')}</div>
     <div>${(p.servingStyles || []).map((s) => glossaryTagHtml(s)).join('')}</div>
     ${p.highlight ? `<div class="highlight">${p.highlight}</div>` : ''}
