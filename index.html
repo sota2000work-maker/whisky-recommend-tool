@@ -292,7 +292,21 @@ function matchesFreeText(product, text) {
   return [product.name, product.country, ...regionValues].filter(Boolean).some((v) => v.includes(text));
 }
 
+// 条件が1つも指定されていない場合、全商品がスコア0で同着になり実質無作為順になってしまうため、
+// UI層に頼らずロジック層でも空配列を返すようにする（呼び出し元がUIのガードを経由しない場合の安全策）。
+function hasAnyCriteria(criteria) {
+  return !!(
+    (criteria.freeText && criteria.freeText.trim())
+    || (criteria.priceBandIds && criteria.priceBandIds.length)
+    || (criteria.countries && criteria.countries.length)
+    || (criteria.regions && criteria.regions.length)
+    || (criteria.flavors && criteria.flavors.length)
+    || (criteria.servingStyles && criteria.servingStyles.length)
+  );
+}
+
 function rankProducts(products, criteria, topN) {
+  if (!hasAnyCriteria(criteria)) return [];
   const active = products.filter((p) => p.status !== 'discontinued' && matchesFreeText(p, criteria.freeText));
   const scored = active.map((p) => ({ product: p, ...scoreProduct(p, criteria) }));
   scored.sort((a, b) => b.score - a.score || b.matchedCount - a.matchedCount);
@@ -595,7 +609,7 @@ async function initAuth() {
 function openGlossary(term) {
   const def = FLAVOR_GLOSSARY[term] || REGION_GLOSSARY[term];
   if (!def) return;
-  document.getElementById('glossaryContent').innerHTML = `<h2>${term}</h2><p>${def}</p>`;
+  document.getElementById('glossaryContent').innerHTML = `<h2>${escapeHtml(term)}</h2><p>${def}</p>`;
   document.getElementById('glossaryOverlay').classList.remove('hidden');
 }
 
@@ -606,7 +620,8 @@ document.getElementById('glossaryCloseButton').addEventListener('click', () => {
 function glossaryTagHtml(term, extraClass) {
   const hasGlossary = FLAVOR_GLOSSARY[term] || REGION_GLOSSARY[term];
   const cls = 'tag' + (hasGlossary ? ' glossary' : '') + (extraClass ? ' ' + extraClass : '');
-  return `<span class="${cls}" data-term="${term}">${term}${hasGlossary ? ' ⓘ' : ''}</span>`;
+  const safeTerm = escapeHtml(term);
+  return `<span class="${cls}" data-term="${safeTerm}">${safeTerm}${hasGlossary ? ' ⓘ' : ''}</span>`;
 }
 
 // タグクリックで用語集を開く（イベント委譲。結果カード・フォーム双方に対応）
@@ -660,6 +675,13 @@ function priceLabelsToBandIds(labels) {
   return PRICE_BANDS.filter((b) => labels.includes(b.label)).map((b) => b.id);
 }
 
+// スプレッドシート由来の文字列をHTMLに埋め込む前にエスケープする（XSS対策）。
+// 数値（price等）はエスケープ不要。
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 function regionText(p) {
   if (!p.region) return '';
   return Array.isArray(p.region) ? p.region.join('・') : p.region;
@@ -667,8 +689,8 @@ function regionText(p) {
 
 function metaLineHtml(p) {
   const price = p.price === null || p.price === undefined ? '価格不明' : p.price.toLocaleString() + '円';
-  const region = regionText(p) ? '（' + regionText(p) + '）' : '';
-  return `<div class="meta">${price}${p.spec ? '（' + p.spec + '）' : ''} ／ ${p.country || '産地不明'}${region}</div>`;
+  const region = regionText(p) ? '（' + escapeHtml(regionText(p)) + '）' : '';
+  return `<div class="meta">${price}${p.spec ? '（' + escapeHtml(p.spec) + '）' : ''} ／ ${escapeHtml(p.country) || '産地不明'}${region}</div>`;
 }
 
 // 画像はアプリと同じ場所の img/ に置いたファイルを使う（外部サイトには接続しない）。
@@ -682,24 +704,24 @@ function thumbHtml(p) {
 function confidenceCaution(p) {
   const lowConfidence = p.attributeConfidence !== 'high' || p.highlightConfidence !== 'high';
   return lowConfidence
-    ? `<div class="caution">⚠ 情報の確証度が低めです。商品コード <span class="code">${p.code}</span> で現物のラベルをご確認ください</div>`
+    ? `<div class="caution">⚠ 情報の確証度が低めです。商品コード <span class="code">${escapeHtml(p.code)}</span> で現物のラベルをご確認ください</div>`
     : '';
 }
 
 function renderResultCard(entry) {
   const p = entry.product;
   const percent = Math.round(entry.score * 100);
-  const highlight = p.highlight ? `<div class="highlight">${p.highlight}</div>` : '';
+  const highlight = p.highlight ? `<div class="highlight">${escapeHtml(p.highlight)}</div>` : '';
   return `
     <div class="card">
       ${thumbHtml(p)}
-      <h3>${p.name}<span class="score">一致度 ${percent}%</span></h3>
+      <h3>${escapeHtml(p.name)}<span class="score">一致度 ${percent}%</span></h3>
       ${metaLineHtml(p)}
       <div>${(p.flavors || []).map((f) => glossaryTagHtml(f)).join('')}</div>
       <div>${(p.servingStyles || []).map((s) => glossaryTagHtml(s)).join('')}</div>
       ${highlight}
       ${confidenceCaution(p)}
-      <div class="code" style="margin-top:6px;">コード: ${p.code}</div>
+      <div class="code" style="margin-top:6px;">コード: ${escapeHtml(p.code)}</div>
     </div>
   `;
 }
@@ -736,12 +758,12 @@ document.getElementById('clearCriteriaButton').addEventListener('click', () => {
 
 function renderListCard(p) {
   return `
-    <div class="card" data-code="${p.code}">
+    <div class="card" data-code="${escapeHtml(p.code)}">
       ${thumbHtml(p)}
-      <h3>${p.name}</h3>
+      <h3>${escapeHtml(p.name)}</h3>
       ${metaLineHtml(p)}
-      <div>${(p.flavors || []).map((f) => `<span class="tag">${f}</span>`).join('')}</div>
-      <div class="code" style="margin-top:6px;">コード: ${p.code}</div>
+      <div>${(p.flavors || []).map((f) => `<span class="tag">${escapeHtml(f)}</span>`).join('')}</div>
+      <div class="code" style="margin-top:6px;">コード: ${escapeHtml(p.code)}</div>
     </div>
   `;
 }
@@ -768,14 +790,15 @@ function openDetail(code) {
   const p = PRODUCTS.find((x) => x.code === code);
   if (!p) return;
   document.getElementById('detailContent').innerHTML = `
-    <h2>${p.name}</h2>
+    ${thumbHtml(p)}
+    <h2>${escapeHtml(p.name)}</h2>
     ${metaLineHtml(p)}
     <div>${(p.flavors || []).map((f) => glossaryTagHtml(f)).join('')}</div>
     <div>${(p.servingStyles || []).map((s) => glossaryTagHtml(s)).join('')}</div>
-    ${p.highlight ? `<div class="highlight">${p.highlight}</div>` : ''}
+    ${p.highlight ? `<div class="highlight">${escapeHtml(p.highlight)}</div>` : ''}
     ${p.status === 'discontinued' ? '<div class="caution">現在は取扱終了商品です</div>' : ''}
     ${confidenceCaution(p)}
-    <div class="code" style="margin-top:8px;">商品コード: ${p.code}</div>
+    <div class="code" style="margin-top:8px;">商品コード: ${escapeHtml(p.code)}</div>
   `;
   document.getElementById('detailOverlay').classList.remove('hidden');
 }
@@ -805,15 +828,15 @@ function populateAdminLists() {
 
   document.getElementById('admActiveList').innerHTML = active.map((p) => `
     <div class="adminListRow">
-      <span class="name">${p.name}</span>
-      <button type="button" class="secondary admDiscontinueBtn" data-code="${p.code}">取り扱い終了</button>
+      <span class="name">${escapeHtml(p.name)}</span>
+      <button type="button" class="secondary admDiscontinueBtn" data-code="${escapeHtml(p.code)}">取り扱い終了</button>
     </div>
   `).join('') || '<p class="muted">対象商品がありません</p>';
 
   document.getElementById('admDiscontinuedList').innerHTML = discontinued.map((p) => `
     <div class="adminListRow">
-      <span class="name">${p.name}</span>
-      <button type="button" class="secondary admReactivateBtn" data-code="${p.code}">再開する</button>
+      <span class="name">${escapeHtml(p.name)}</span>
+      <button type="button" class="secondary admReactivateBtn" data-code="${escapeHtml(p.code)}">再開する</button>
     </div>
   `).join('') || '<p class="muted">取り扱い終了中の商品はありません</p>';
 
