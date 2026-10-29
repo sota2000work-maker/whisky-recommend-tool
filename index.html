@@ -731,12 +731,13 @@ function confidenceCaution(p) {
 
 function renderResultCard(entry) {
   const p = entry.product;
-  const percent = Math.round(entry.score * 100);
+  // フリーワードだけで検索した場合は一致度を計算する条件がなく、全件「0%」と出て誤解を招くため表示しない（2026-10修正）
+  const scoreBadge = entry.totalCriteria > 0 ? `<span class="score">一致度 ${Math.round(entry.score * 100)}%</span>` : '';
   const highlight = p.highlight ? `<div class="highlight">${escapeHtml(p.highlight)}</div>` : '';
   return `
     <div class="card">
       ${thumbHtml(p)}
-      <h3>${escapeHtml(p.name)}<span class="score">一致度 ${percent}%</span></h3>
+      <h3>${escapeHtml(p.name)}${scoreBadge}</h3>
       ${metaLineHtml(p)}
       <div>${(p.flavors || []).map((f) => glossaryTagHtml(f)).join('')}</div>
       <div>${(p.servingStyles || []).map((s) => glossaryTagHtml(s)).join('')}</div>
