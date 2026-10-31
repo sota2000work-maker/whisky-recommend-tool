@@ -35,7 +35,7 @@
   legend { font-weight: 600; padding: 0 8px; color: var(--whisky); font-size: 14px; }
   label { display: inline-block; margin: 6px 10px 6px 0; padding: 4px 2px; }
   label input[type="checkbox"] { width: 18px; height: 18px; vertical-align: middle; margin-right: 4px; accent-color: var(--whisky); }
-  input[type="text"], input[type="password"] {
+  input[type="text"], input[type="password"], input[type="number"], select, textarea {
     font-size: 16px; padding: 9px 10px; width: 100%; margin: 4px 0 8px;
     border: 1px solid var(--border); border-radius: 8px; background: var(--paper); color: var(--ink);
   }
@@ -95,6 +95,10 @@
   .adminListRow:last-child { border-bottom: none; }
   .adminListRow .name { font-size: 14px; }
   .adminListRow button { margin-top: 0; padding: 6px 12px; font-size: 13px; width: auto; }
+  .adminListRow .btns { display: flex; gap: 6px; flex-shrink: 0; }
+  .admField { display: block; margin: 6px 0; }
+  .admDeleteConfirm { border: 2px solid #b3261e; border-radius: 8px; padding: 10px; margin-top: 8px; }
+  .admDeleteConfirm .danger { color: #b3261e; border-color: #b3261e; }
 
   .learnToc { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; }
   .learnToc.hidden { display: none; }
@@ -198,13 +202,34 @@
 
 <section id="tab-admin" class="tabPanel">
   <div id="adminGate">
-    <p class="muted">取り扱い終了・再開の操作には、閲覧用とは別の管理パスコードが必要です。</p>
+    <p class="muted">追加・価格改定・取り扱い終了の操作には、閲覧用とは別の管理パスコードが必要です。</p>
     <input type="password" id="adminPasscode" placeholder="管理パスコード">
     <button type="button" id="adminUnlockButton" class="secondary">管理画面を開く</button>
   </div>
 
   <div id="adminBody">
     <div id="adminMsg"></div>
+
+    <fieldset id="admAddFieldset">
+      <legend>新商品を追加</legend>
+      <label class="admField">JANコード（バーコードの数字・空欄でも可）<input type="text" id="admCode" inputmode="numeric"></label>
+      <label class="admField">商品名<input type="text" id="admName"></label>
+      <label class="admField">容量（例：700ml）<input type="text" id="admSpec"></label>
+      <label class="admField">販売価格（円）<input type="number" id="admPrice" min="0" inputmode="numeric"></label>
+      <label class="admField">国<select id="admCountry"></select></label>
+      <label class="admField" id="admRegionField">地方（任意）<select id="admRegion"></select></label>
+      <div><b>味わい（複数選択可）</b><div id="admFlavorFields"></div></div>
+      <div><b>飲み方（複数選択可）</b><div id="admServingFields"></div></div>
+      <label class="admField">商品説明（任意）<textarea id="admHighlight" rows="3"></textarea></label>
+      <button type="button" id="admAddButton" class="primary">この内容で追加</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>価格改定</legend>
+      <label class="admField">対象商品<select id="admPriceTarget"></select></label>
+      <label class="admField">新しい販売価格（円）<input type="number" id="admNewPrice" min="0" inputmode="numeric"></label>
+      <button type="button" id="admPriceButton" class="primary">価格を更新</button>
+    </fieldset>
 
     <fieldset>
       <legend>取り扱い終了にする</legend>
@@ -214,6 +239,11 @@
     <fieldset>
       <legend>取り扱いを再開する</legend>
       <div id="admDiscontinuedList"></div>
+      <div id="admDeleteConfirm" class="admDeleteConfirm hidden">
+        <p><b id="admDeleteConfirmName"></b> を完全に削除します。<br>この操作は元に戻せません。よろしいですか？</p>
+        <button type="button" id="admDeleteConfirmButton" class="secondary danger">はい、完全に削除する</button>
+        <button type="button" id="admDeleteCancelButton" class="secondary">キャンセル</button>
+      </div>
     </fieldset>
   </div>
 </section>
@@ -479,7 +509,7 @@ const SEED_PRODUCTS = [
 ;
 
 // ここにGoogle Apps ScriptのWebアプリURLを設定すると、スタッフパスコードでの同期・
-// 管理タブでの取り扱い終了/再開が有効になる。
+// 管理タブでの追加・価格改定・取り扱い終了/再開・削除が有効になる。
 // 未設定の間は開発確認用として、パスコード入力後にSEED_PRODUCTS（非機密のプレースホルダー）
 // を表示する（実データではないので公開ホスティングしても問題ない）。
 // 設定後は build.js を再実行して index.html を作り直すこと。
@@ -856,7 +886,7 @@ document.getElementById('detailCloseButton').addEventListener('click', () => {
   document.getElementById('detailOverlay').classList.add('hidden');
 });
 
-// ---------- 管理タブ（取り扱い終了・再開のみ） ----------
+// ---------- 管理タブ ----------
 
 let adminPasscodeValue = '';
 
@@ -880,6 +910,12 @@ function populateAdminLists() {
   const active = PRODUCTS; // サーバー側で既に取扱中のみに絞り込まれている
   const discontinued = ADMIN_DISCONTINUED; // 管理パスコードで認証済みの場合のみ入っている
 
+  // 価格改定の対象一覧。同期で作り直しても、選んでいた商品はそのまま残す
+  const priceSelect = document.getElementById('admPriceTarget');
+  const selected = priceSelect.value;
+  priceSelect.innerHTML = active.map((p) => `<option value="${escapeHtml(p.code)}">${escapeHtml(p.name)}（${formatAdminPrice(p.price)}）</option>`).join('');
+  if (active.some((p) => p.code === selected)) priceSelect.value = selected;
+
   document.getElementById('admActiveList').innerHTML = active.map((p) => `
     <div class="adminListRow">
       <span class="name">${escapeHtml(p.name)}</span>
@@ -890,7 +926,10 @@ function populateAdminLists() {
   document.getElementById('admDiscontinuedList').innerHTML = discontinued.map((p) => `
     <div class="adminListRow">
       <span class="name">${escapeHtml(p.name)}</span>
-      <button type="button" class="secondary admReactivateBtn" data-code="${escapeHtml(p.code)}">再開する</button>
+      <span class="btns">
+        <button type="button" class="secondary admReactivateBtn" data-code="${escapeHtml(p.code)}">再開する</button>
+        <button type="button" class="secondary admDeleteBtn" data-code="${escapeHtml(p.code)}">削除</button>
+      </span>
     </div>
   `).join('') || '<p class="muted">取り扱い終了中の商品はありません</p>';
 
@@ -900,6 +939,10 @@ function populateAdminLists() {
   document.querySelectorAll('.admReactivateBtn').forEach((btn) => {
     btn.addEventListener('click', () => setStatus(btn.getAttribute('data-code'), 'active'));
   });
+  document.querySelectorAll('.admDeleteBtn').forEach((btn) => {
+    btn.addEventListener('click', () => askDelete(btn.getAttribute('data-code')));
+  });
+  document.getElementById('admDeleteConfirm').classList.add('hidden');
 }
 
 function showAdminMsg(text, ok) {
@@ -923,7 +966,7 @@ async function callAppsScript(payload) {
       return false;
     }
     if (data.error) {
-      showAdminMsg('エラーが発生しました: ' + data.error, false);
+      showAdminMsg(ADMIN_ERROR_MESSAGES[data.error] || ('エラーが発生しました: ' + data.error), false);
       return false;
     }
     const staffPasscode = localStorage.getItem(STAFF_PASSCODE_KEY) || '';
@@ -939,6 +982,129 @@ async function setStatus(code, status) {
   const success = await callAppsScript({ action: 'setStatus', code, status });
   if (success) showAdminMsg(status === 'discontinued' ? '取り扱い終了にしました' : '取り扱いを再開しました', true);
 }
+
+const ADMIN_ERROR_MESSAGES = {
+  duplicate_code: 'このJANコードの商品はすでに登録されています（取り扱い終了中の商品も含みます）。',
+  invalid_price: '価格は0以上の整数で入力してください。',
+  invalid_product: '商品名を入力してください。',
+  unknown_action: 'この操作を使うには、Apps Scriptの更新（再デプロイ）が必要です。',
+};
+
+function formatAdminPrice(price) {
+  return price === null || price === undefined ? '価格未設定' : `${Number(price).toLocaleString()}円`;
+}
+
+// 空欄は null（価格未設定）、0以上の整数でないものは undefined を返す
+function parsePriceInput(id) {
+  const raw = document.getElementById(id).value.trim();
+  if (raw === '') return null;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 ? n : undefined;
+}
+
+function textOrNull(id) {
+  return document.getElementById(id).value.trim() || null;
+}
+
+function initAdminForm() {
+  const country = document.getElementById('admCountry');
+  country.innerHTML = COUNTRIES.map((c) => `<option value="${c}">${c}</option>`).join('');
+  country.addEventListener('change', updateAdminRegion);
+  updateAdminRegion();
+  renderCheckboxGroup('admFlavorFields', 'admFlavor', FLAVOR_TAGS);
+  renderCheckboxGroup('admServingFields', 'admServingStyle', SERVING_STYLE_TAGS);
+}
+
+// 地方欄は、地方の区分がある国（スコットランド）を選んだときだけ出す
+function updateAdminRegion() {
+  const regions = REGIONS_BY_COUNTRY[document.getElementById('admCountry').value] || [];
+  document.getElementById('admRegionField').style.display = regions.length ? 'block' : 'none';
+  document.getElementById('admRegion').innerHTML = '<option value="">（指定なし）</option>'
+    + regions.map((r) => `<option value="${r}">${r}</option>`).join('');
+}
+
+function adminToolFields() {
+  return {
+    country: document.getElementById('admCountry').value || null,
+    region: document.getElementById('admRegion').value || null,
+  };
+}
+
+document.getElementById('admAddButton').addEventListener('click', async () => {
+  const name = document.getElementById('admName').value.trim();
+  if (!name) { showAdminMsg('商品名を入力してください', false); return; }
+  const code = document.getElementById('admCode').value.replace(/\s/g, '');
+  if (code && !/^\d{8,14}$/.test(code)) { showAdminMsg('JANコードは8〜14桁の数字で入力してください（空欄でも追加できます）', false); return; }
+  const price = parsePriceInput('admPrice');
+  if (price === undefined) { showAdminMsg('価格は0以上の整数で入力してください', false); return; }
+  const product = {
+    // JANが分からない商品は、既存のJANと重ならない仮コードにする
+    code: code || 'WH-' + Date.now(),
+    name,
+    spec: textOrNull('admSpec'),
+    price,
+    ...adminToolFields(),
+    flavors: getCheckedValues('admFlavor'),
+    servingStyles: getCheckedValues('admServingStyle'),
+    highlight: textOrNull('admHighlight'),
+    highlightConfidence: 'high',
+    highlightSource: '管理画面から追加',
+    attributeConfidence: 'high',
+    attributeSource: '管理画面から追加',
+    status: 'active',
+  };
+  const success = await callAppsScript({ action: 'add', product });
+  if (success) {
+    showAdminMsg('「' + escapeHtml(name) + '」を追加しました', true);
+    const fieldset = document.getElementById('admAddFieldset');
+    fieldset.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach((el) => { el.value = ''; });
+    fieldset.querySelectorAll('input[type="checkbox"]').forEach((el) => { el.checked = false; });
+    // 選択欄も先頭に戻す（ウイスキーは国に合わせて地方欄も作り直す）
+    fieldset.querySelectorAll('select').forEach((el) => { el.selectedIndex = 0; el.dispatchEvent(new Event('change')); });
+  }
+});
+
+document.getElementById('admPriceButton').addEventListener('click', async () => {
+  const code = document.getElementById('admPriceTarget').value;
+  const newPrice = parsePriceInput('admNewPrice');
+  if (!code || newPrice === null || newPrice === undefined) {
+    showAdminMsg('対象商品と新しい販売価格（0以上の整数）を指定してください', false);
+    return;
+  }
+  const product = PRODUCTS.find((p) => p.code === code);
+  const success = await callAppsScript({ action: 'update', code, patch: { price: newPrice } });
+  if (success) {
+    const label = product ? `「${escapeHtml(product.name)}」の価格を ${formatAdminPrice(product.price)} → ` : '価格を ';
+    showAdminMsg(`${label}${formatAdminPrice(newPrice)} に更新しました`, true);
+    document.getElementById('admNewPrice').value = '';
+  }
+});
+
+// 完全削除は取り扱い終了中の商品だけが対象。誤操作を防ぐため、確認欄で2回目のタップを求める
+let pendingDeleteCode = null;
+
+function askDelete(code) {
+  const product = ADMIN_DISCONTINUED.find((p) => p.code === code);
+  pendingDeleteCode = code;
+  document.getElementById('admDeleteConfirmName').textContent = product ? product.name : code;
+  const box = document.getElementById('admDeleteConfirm');
+  box.classList.remove('hidden');
+  box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+document.getElementById('admDeleteCancelButton').addEventListener('click', () => {
+  pendingDeleteCode = null;
+  document.getElementById('admDeleteConfirm').classList.add('hidden');
+});
+
+document.getElementById('admDeleteConfirmButton').addEventListener('click', async () => {
+  const code = pendingDeleteCode;
+  if (!code) return;
+  pendingDeleteCode = null;
+  document.getElementById('admDeleteConfirm').classList.add('hidden');
+  const success = await callAppsScript({ action: 'delete', code });
+  if (success) showAdminMsg('完全に削除しました', true);
+});
 
 // ---------- 学ぶタブ ----------
 
@@ -1115,6 +1281,7 @@ function startApp() {
   renderListResults();
   renderLearn();
   updateSyncStatus();
+  initAdminForm();
   populateAdminLists();
 }
 

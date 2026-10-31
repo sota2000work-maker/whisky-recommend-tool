@@ -2,7 +2,7 @@
 // アプリ本体（HTML/アイコン等）をキャッシュし、オフラインでも起動できるようにする。
 // Apps Script への同期リクエスト（他オリジン）はキャッシュ対象外で、通常通りネットワークに任せる。
 
-const CACHE_NAME = 'whisky-tool-v9c56423933';
+const CACHE_NAME = 'whisky-tool-vf6d4d1757b';
 const APP_SHELL = [
   './',
   './index.html',
