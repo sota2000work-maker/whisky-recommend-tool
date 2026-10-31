@@ -96,6 +96,25 @@
   .adminListRow .name { font-size: 14px; }
   .adminListRow button { margin-top: 0; padding: 6px 12px; font-size: 13px; width: auto; }
 
+  .learnToc { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; }
+  .learnToc.hidden { display: none; }
+  .learnToc button { margin: 0; padding: 6px 12px; font-size: 13px; border-radius: 999px; }
+  .learnSection h2 { font-size: 17px; color: var(--whisky-dark); margin: 18px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); scroll-margin-top: 64px; }
+  .learnItem { border: 1px solid var(--border); border-left: 4px solid var(--amber); border-radius: 12px; margin-bottom: 8px; background: var(--paper); }
+  .learnItem summary { padding: 11px 14px; font-weight: 600; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .learnItem summary::-webkit-details-marker { display: none; }
+  .learnItem summary::after { content: '＋'; color: var(--amber); font-weight: 700; flex-shrink: 0; }
+  .learnItem[open] summary::after { content: '－'; }
+  .learnBody { padding: 0 14px 12px; font-size: 14px; }
+  .learnBody p { margin: 0 0 8px; }
+  .learnTableWrap { overflow-x: auto; margin: 0 0 8px; }
+  .learnTable { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .learnTable th, .learnTable td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: top; }
+  .learnTable th { background: var(--cream); white-space: nowrap; }
+  .learnTable td:first-child { white-space: nowrap; font-weight: 600; }
+  .learnTalk { font-size: 14px; color: var(--whisky-dark); background: var(--amber-soft); padding: 8px 10px; border-radius: 8px; border-left: 3px solid var(--amber); }
+  .learnTalk b { font-size: 12px; }
+
   @media (max-width: 480px) {
     body { padding: 10px 8px 28px; font-size: 15px; }
     label { display: block; }
@@ -126,6 +145,7 @@
 <div class="tabBar">
   <button type="button" class="tabBtn active" data-tab="recommend">レコメンド</button>
   <button type="button" class="tabBtn" data-tab="list">一覧</button>
+  <button type="button" class="tabBtn" data-tab="learn">学ぶ</button>
   <button type="button" class="tabBtn" data-tab="admin">管理</button>
 </div>
 
@@ -167,6 +187,13 @@
 <section id="tab-list" class="tabPanel">
   <input type="text" id="listSearch" placeholder="商品名・国・地方で検索">
   <div id="listResults"></div>
+</section>
+
+<section id="tab-learn" class="tabPanel">
+  <p class="muted">接客中に説明に困りやすい基本用語をまとめました。見出しをタップすると説明が開きます。</p>
+  <input type="text" id="learnSearch" placeholder="用語・説明文を検索">
+  <div id="learnToc" class="learnToc"></div>
+  <div id="learnContent"></div>
 </section>
 
 <section id="tab-admin" class="tabPanel">
@@ -913,6 +940,162 @@ async function setStatus(code, status) {
   if (success) showAdminMsg(status === 'discontinued' ? '取り扱い終了にしました' : '取り扱いを再開しました', true);
 }
 
+// ---------- 学ぶタブ ----------
+
+// 基礎知識（1項目＝用語・説明・接客での一言。比較表がある項目のみ table を持つ）
+const LEARN_SECTIONS = [
+  {
+    title: '種類・定義',
+    items: [
+      {
+        term: '5大ウイスキー',
+        body: '世界的に評価の高い5つの産地のウイスキーの総称です。スコッチ（スコットランド）、アイリッシュ（アイルランド）、アメリカン（アメリカ）、カナディアン（カナダ）、ジャパニーズ（日本）を指します。産地ごとに原料・蒸留・熟成のルールや伝統が異なり、味わいの傾向も変わります。',
+        table: {
+          head: ['産地', '主な特徴'],
+          rows: [
+            ['スコッチ', 'モルトとグレーンが基本。スコットランドで3年以上樽熟成。地方ごとの個性が豊かで、ピートのスモーキーな香りを持つ銘柄も'],
+            ['アイリッシュ', 'アイルランド島で3年以上樽熟成。3回蒸留の銘柄が多く、なめらかで軽やかな口当たり'],
+            ['アメリカン', 'バーボンやライが代表。内側を焦がした新樽で熟成するものが多く、バニラやキャラメルのような甘い香り'],
+            ['カナディアン', '3年以上樽熟成。軽やかでクセが少なく、ハイボールやカクテルにも使いやすい'],
+            ['ジャパニーズ', '繊細でバランスの良い味わい。ミズナラ樽など日本ならではの樽も使われる'],
+          ],
+        },
+        talk: 'まずはどの国のウイスキーかを見ると、味の方向性がつかみやすいですよ。',
+      },
+      {
+        term: 'モルト・グレーン・ブレンデッドの違い',
+        body: '原料と蒸留方法による分け方です。モルトウイスキーは大麦麦芽（モルト）だけを原料に、単式蒸留器（ポットスチル）で蒸留したもの。グレーンウイスキーはトウモロコシや小麦などの穀物を主原料に、連続式蒸留機で蒸留したもの。ブレンデッドウイスキーは、モルトとグレーンを混ぜ合わせたものです。',
+        table: {
+          head: ['種類', '味わいの傾向'],
+          rows: [
+            ['モルト', '原料由来の香りが強く、蒸留所ごとの個性がはっきりしている'],
+            ['グレーン', '軽やかでクセが少なく、穏やかな甘み'],
+            ['ブレンデッド', '個性と飲みやすさのバランスが良く、手ごろな価格の銘柄も多い'],
+          ],
+        },
+        talk: '個性を楽しむならモルト、飲みやすさならブレンデッドがおすすめです。',
+      },
+      {
+        term: 'シングルモルトの「シングル」の意味',
+        body: '「シングル」は「1つの蒸留所」という意味で、「1つの樽」という意味ではありません。シングルモルトは、1つの蒸留所で造られたモルトウイスキーだけを使ったもので、同じ蒸留所の複数の樽の原酒を混ぜることは問題ありません。複数の蒸留所のモルトを混ぜたものは「ブレンデッドモルト」、1つの樽だけから瓶詰めしたものは「シングルカスク」と呼び、別の言葉です。',
+        talk: 'シングルモルトは、ひとつの蒸留所の個性をそのまま味わえるウイスキーです。',
+      },
+      {
+        term: '熟成年数の表記とノンエイジ',
+        body: 'ラベルの「12年」などは、瓶の中に使われている原酒のうち最も若いものの熟成年数です。12年表記なら、すべての原酒が12年以上熟成しています。年数を表示しないものは「ノンエイジ（NAS）」と呼ばれ、若い原酒の良さを活かしたり、年数にとらわれずに味を設計したりした銘柄です。品質が劣るという意味ではありません。スコッチの場合は、ノンエイジでも3年以上の熟成が法律で決められています。',
+        talk: '年数は中に入っている一番若い原酒の年数なので、表示より長く熟成した原酒も入っています。',
+      },
+      {
+        term: 'バーボンの定義',
+        body: 'アメリカの法律で定められたウイスキーの一種です。主な条件は、アメリカで造ること、原料の51%以上がトウモロコシであること、内側を焦がしたオークの新樽で熟成させること。ほかにも蒸留時のアルコール度数80%以下、樽詰め時62.5%以下、瓶詰め時40%以上といった決まりがあり、着色料や香料は加えられません。ケンタッキー州のものが多いですが、アメリカ国内ならほかの州で造ってもバーボンと名乗れます。2年以上熟成させるなど条件を満たしたものは「ストレート・バーボン」と表示できます。',
+        talk: 'バーボンは毎回新しい焦がした樽で熟成するので、バニラやキャラメルのような甘い香りが出やすいんです。',
+      },
+    ],
+  },
+  {
+    title: '造り方・熟成',
+    items: [
+      {
+        term: '樽の種類（バーボン樽・シェリー樽・ミズナラ樽）',
+        body: 'ウイスキーは樽で熟成させる間に、色や香りの多くを樽から得ます。どんな樽を使ったかで、味わいが大きく変わります。',
+        table: {
+          head: ['樽', '特徴'],
+          rows: [
+            ['バーボン樽', 'バーボンの熟成に使ったアメリカンオークの樽。バニラ・ココナッツ・はちみつのような甘い香り。スコッチで最も多く使われる'],
+            ['シェリー樽', 'スペインの酒精強化ワイン「シェリー」を入れていた樽。レーズンなどのドライフルーツやチョコレートのような濃厚な甘さと、深い色合い'],
+            ['ミズナラ樽', '日本原産のオーク材の樽。白檀や伽羅のような、お香を思わせる香りが特徴'],
+          ],
+        },
+        talk: 'シェリー樽のものはドライフルーツのような濃い甘さ、バーボン樽のものはバニラのような甘さが出やすいです。',
+      },
+      {
+        term: 'カスクストレングス・シングルカスク',
+        body: 'カスクストレングスは、樽から出したままの度数で、水で薄めずに瓶詰めしたものです。多くのウイスキーは40〜46%ほどに加水して瓶詰めしますが、カスクストレングスは50〜60%台のものが多く、香りも味も濃厚です。シングルカスクは、1つの樽の原酒だけを瓶詰めしたもの。樽ごとに味が違うため本数が限られ、一期一会の味わいになります。',
+        talk: '度数が高いので、少し水を足すと香りが開いて飲みやすくなります。',
+      },
+      {
+        term: 'エンジェルズシェア（天使の分け前）',
+        body: '熟成中に樽の中のウイスキーが少しずつ蒸発して減っていくことを、「天使の分け前」と呼びます。スコットランドでは1年に約2%減るのが目安とされ、気温の高い地域ほど多く減ります。長期熟成のウイスキーが希少で高価になる理由のひとつです。',
+        talk: '長く熟成するほど天使に飲まれて量が減るので、年数の長いものは希少なんです。',
+      },
+    ],
+  },
+  {
+    title: '飲み方',
+    items: [
+      {
+        term: '加水・トワイスアップ',
+        body: 'ウイスキーに少量の水を加えると、アルコールの刺激がやわらぎ、閉じていた香りが開くことがあります。まずはストレートに数滴たらして、変化を楽しむのがおすすめです。トワイスアップは、ウイスキーと常温の水を1対1で割る飲み方で、ブレンダーが香りを確かめるときにも使われます。氷を入れないので、香りがよくわかります。',
+        talk: '水を数滴たらすだけで香りが立つので、ぜひ試してみてください。',
+      },
+      {
+        term: 'ハイボールの作り方の基本',
+        body: 'ウイスキー1に対してソーダ3〜4が目安です。おいしく作るコツは、①グラスに氷をいっぱいに入れる、②ウイスキーを注いでよく混ぜ、しっかり冷やす、③よく冷えたソーダを氷に当てないよう静かに注ぐ、④マドラーで縦に1回だけ軽く混ぜる、の4つ。混ぜすぎると炭酸が抜けてしまいます。',
+        talk: 'ソーダは氷に当てないように静かに注ぐと、炭酸が抜けにくくなります。',
+      },
+    ],
+  },
+  { title: '味わいタグ', items: glossaryItems(FLAVOR_GLOSSARY) },
+  { title: 'スコッチの地方', items: glossaryItems(REGION_GLOSSARY) },
+];
+
+function glossaryItems(glossary) {
+  return Object.entries(glossary).map(([term, body]) => ({ term, body }));
+}
+
+function normalizeLearnText(str) {
+  return String(str).normalize('NFKC').toLowerCase();
+}
+
+function learnItemHtml(item) {
+  const table = item.table
+    ? `<div class="learnTableWrap"><table class="learnTable"><tr>${item.table.head.map((h) => `<th>${escapeHtml(h)}</th>`).join('')}</tr>${item.table.rows.map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</table></div>`
+    : '';
+  const talk = item.talk ? `<div class="learnTalk"><b>接客での一言</b><br>「${escapeHtml(item.talk)}」</div>` : '';
+  return `<details class="learnItem"><summary>${escapeHtml(item.term)}</summary><div class="learnBody"><p>${escapeHtml(item.body)}</p>${table}${talk}</div></details>`;
+}
+
+function renderLearn() {
+  document.getElementById('learnToc').innerHTML = LEARN_SECTIONS.map((s, i) =>
+    `<button type="button" class="secondary" data-learn-jump="${i}">${escapeHtml(s.title)}</button>`).join('');
+  document.getElementById('learnContent').innerHTML = LEARN_SECTIONS.map((s, i) =>
+    `<div class="learnSection" id="learnSection${i}"><h2>${escapeHtml(s.title)}</h2>${s.items.map(learnItemHtml).join('')}</div>`).join('')
+    + '<p id="learnEmpty" class="muted hidden">該当する用語がありません。</p>';
+
+  // 検索用の文字列は用語・説明・一言・表の中身をまとめて持たせる
+  const items = LEARN_SECTIONS.flatMap((s) => s.items);
+  document.querySelectorAll('#learnContent .learnItem').forEach((el, i) => {
+    const item = items[i];
+    const tableText = item.table ? item.table.head.concat(...item.table.rows).join(' ') : '';
+    el.dataset.search = normalizeLearnText([item.term, item.body, item.talk || '', tableText].join(' '));
+  });
+}
+
+function filterLearn() {
+  const q = normalizeLearnText(document.getElementById('learnSearch').value.trim());
+  let anyHit = false;
+  document.querySelectorAll('#learnContent .learnSection').forEach((sec) => {
+    let secHit = false;
+    sec.querySelectorAll('.learnItem').forEach((el) => {
+      const hit = !q || el.dataset.search.includes(q);
+      el.classList.toggle('hidden', !hit);
+      el.open = Boolean(q) && hit;
+      if (hit) secHit = true;
+    });
+    sec.classList.toggle('hidden', !secHit);
+    if (secHit) anyHit = true;
+  });
+  document.getElementById('learnEmpty').classList.toggle('hidden', anyHit);
+  document.getElementById('learnToc').classList.toggle('hidden', Boolean(q));
+}
+
+document.getElementById('learnSearch').addEventListener('input', filterLearn);
+
+document.getElementById('learnToc').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-learn-jump]');
+  if (btn) document.getElementById('learnSection' + btn.getAttribute('data-learn-jump')).scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
 // ---------- タブ切り替え ----------
 
 document.querySelectorAll('.tabBtn').forEach((btn) => {
@@ -930,6 +1113,7 @@ function startApp() {
   initForm();
   updateRegionField();
   renderListResults();
+  renderLearn();
   updateSyncStatus();
   populateAdminLists();
 }
