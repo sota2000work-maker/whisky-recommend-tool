@@ -419,11 +419,57 @@ function scoreProduct(product, criteria) {
   return { score, matchedCount, totalCriteria, breakdown };
 }
 
-// 商品名・国・地方を対象にした部分一致検索（一覧タブ・レコメンドタブ共通）
+// 検索の表記ゆれの組（ウイスキー用）。[揺れ側, そろえる側] をふつうの書き方で足せばよい（共通の変換は自動でかかる）。
+const SEARCH_VARIANTS = [
+  ['ウィ', 'ウイ'],                 // ウィスキー → ウイスキー、ウィリアム → ウイリアム
+  ['アードベック', 'アードベッグ'],
+  ['フィディッヒ', 'フィディック'],
+  ['ローヤル', 'ロイヤル'],         // クラウンローヤル → クラウンロイヤル
+  ['ジェイムソン', 'ジェムソン'],
+  ['ボーモア', 'ボウモア'],
+  ['ローゼズ', 'ローゼス'],         // フォアローゼズ → フォアローゼス
+];
+
+// ---------- 4ツール共通：検索の表記ゆれ吸収（ワイン・ウイスキー・焼酎・日本酒で同じ。違うのは上の SEARCH_VARIANTS だけ） ----------
+// 入力側・商品側の両方に同じ変換をかけてから部分一致で比べる。商品データそのものは書き換えない（2026-11追加）。
+// 共通でそろえるもの：全角/半角・大文字/小文字、ひらがな/カタカナ、旧字体（齋→斎、龍→竜、廣→広、濱→浜 など）、
+// ヴ/バ行（ヴォ→ボ）、長音「ー」・中黒「・」・小さい「ッ」・空白・かっこ・「〜」（メルロ/メルロー、クラッシコ/クラシコ）、°/度。
+// このブロックを直すときは4ツールの scoring.js を同時に直すこと。
+const SEARCH_CHAR_MAP = {
+  齋: '斎', 彌: '弥', 龍: '竜', 澤: '沢', 櫻: '桜', 寶: '宝', 傳: '伝', 眞: '真', 國: '国', 藏: '蔵',
+  萬: '万', 壽: '寿', 醉: '酔', 黑: '黒', 嶋: '島', 嶌: '島', 濱: '浜', 邊: '辺', 邉: '辺', 髙: '高',
+  﨑: '崎', 德: '徳', 廣: '広', 當: '当', 榮: '栄', 惠: '恵', 釀: '醸', 壺: '壷', ヰ: 'イ', ヱ: 'エ', '°': '度',
+};
+const SEARCH_CHAR_RE = new RegExp('[' + Object.keys(SEARCH_CHAR_MAP).join('') + ']', 'g');
+
+function baseNormalizeSearchText(str) {
+  return String(str).normalize('NFKC').toLowerCase()
+    .replace(/[ぁ-ゖ]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60)) // ひらがな → カタカナ
+    .replace(SEARCH_CHAR_RE, (c) => SEARCH_CHAR_MAP[c])
+    .replace(/ヴァ/g, 'バ').replace(/ヴィ/g, 'ビ').replace(/ヴェ/g, 'ベ').replace(/ヴォ/g, 'ボ')
+    .replace(/ヴュ/g, 'ビュ').replace(/ヴ/g, 'ブ')
+    .replace(/[ー\-‐―−・･=\s~〜ッ「」『』()【】"']/g, '');
+}
+
+// SEARCH_VARIANTS はふつうの書き方で書いてあるので、共通の変換をかけた形にしてから使う
+const SEARCH_VARIANT_PAIRS = SEARCH_VARIANTS
+  .map(([from, to]) => [baseNormalizeSearchText(from), baseNormalizeSearchText(to)])
+  .filter(([from, to]) => from && from !== to);
+
+function normalizeSearchText(str) {
+  let s = baseNormalizeSearchText(str);
+  for (const [from, to] of SEARCH_VARIANT_PAIRS) s = s.split(from).join(to);
+  return s;
+}
+// ---------- 4ツール共通ここまで ----------
+
+// 商品名・国・地方を対象にした部分一致検索（一覧タブ・レコメンドタブ共通）。表記ゆれは normalizeSearchText で吸収する
 function matchesFreeText(product, text) {
   if (!text) return true;
+  const q = normalizeSearchText(text);
+  if (!q) return true;
   const regionValues = Array.isArray(product.region) ? product.region : [product.region];
-  return [product.name, product.country, ...regionValues].filter(Boolean).some((v) => v.includes(text));
+  return [product.name, product.country, ...regionValues].filter(Boolean).some((v) => normalizeSearchText(v).includes(q));
 }
 
 // 条件が1つも指定されていない場合、全商品がスコア0で同着になり実質無作為順になってしまうため、
